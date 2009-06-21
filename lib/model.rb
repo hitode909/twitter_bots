@@ -1,24 +1,49 @@
-# -*- coding: utf-8 -*-
-require 'sequel'
+require 'open-uri'
+require 'hpricot'
+require 'twitter'
+require 'kconv'
+require 'pit'
 require 'cgi'
-Sequel::Model.plugin(:schema)
-DB = Sequel.sqlite('hot_keyword.db')
 
-class HotKeyword < Sequel::Model
+class Api
+  def initialize(name)
+    config = Pit.get(name, :require => {
+        'username' => 'you email in twitter',
+        'password' => 'your password in twitter',
+      })
+    httpAuth = Twitter::HTTPAuth.new(config['username'], config['password'])
+    @twitter = Twitter::Base.new(httpAuth)
+  end
+
+  def update(string)
+    puts "update: " + string
+    @twitter.update string.toutf8
+  end
+end
+
+class HotKeyword < Hash
   TOP_URI = 'http://h.hatena.ne.jp/'
   SOURCE_URI = 'http://h.hatena.ne.jp/hotkeywords'
+  attr_accessor :level, :keyword
 
-  set_schema do
-    primary_key :id
-    String :keyword, :null => false
-    Integer :level, :null => false
-    time :created
+  def level
+    self[:level]
   end
-  create_table unless table_exists?
+  def keyword
+    self[:keyword]
+  end
 
   def uri
     TOP_URI + 'keyword/' + CGI.escape(self.keyword)
   end
 
-  # TODO: fetch method with level
+  def self.fetch
+    doc = Hpricot(open(SOURCE_URI).read)
+    doc.search('div.streambody > ul.cloud > li').map do |item|
+      level = item.get_attribute('class').scan(/\d+$/).to_s.to_i
+      anchor = item.search('a.keyword').first
+      keyword = anchor.inner_text
+      self[:level =>  level, :keyword => keyword]
+    end
+  end
 end

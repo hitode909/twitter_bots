@@ -1,60 +1,41 @@
 # -*- coding: utf-8 -*-
-require 'open-uri'
-require 'hpricot'
-require 'twitter'
-require 'kconv'
+require 'pstore'
+require 'tmpdir'
 require 'lib/model'
-require 'pp'
-require 'pit'
 
-# TODO: レベルの閾値を動的に調整してポスト数を調整
-# TODO: ロジックをmodelに移す
+# usage
+if ARGV.size == 0
+  raise "usage: this [RANKING, NEW]"
+end
 
-now = Time.now
+# prepare
+APPLICATION = 'haiku_hot'
+api = Api.new(APPLICATION)
+db = PStore.new("#{Dir.tmpdir}/#{APPLICATION}")
 
-config = Pit.get("haiku_hot_account", :require => {
-    "username" => "you email in twitter",
-    "password" => "your password in twitter",
-  })
-
-httpAuth = Twitter::HTTPAuth.new(config['username'], config['password'])
-twitter = Twitter::Base.new(httpAuth)
-
-doc = Hpricot(open('http://h.hatena.ne.jp/hotkeywords').read)
-
-recents = doc.search('div.streambody > ul.cloud > li').map { |item|
-  level = item.get_attribute('class').scan(/\d+$/).to_s.to_i
-  anchor = item.search('a.keyword').first
-  keyword = anchor.inner_text
-  if level >1
-    HotKeyword.create(:level =>  level, :keyword => keyword, :created => now)
-  else
-    nil
-  end
-}.compact.sort_by{ |k| k.level}.reverse
-
-ranking = ['LIST', *recents.map{|k| k.keyword}].join(' ').toutf8
-puts ranking
-twitter.update ranking
-
-recents.map{ |recent|
-  { :recent => recent,
-    :previous => HotKeyword.filter(:keyword => recent.keyword).filter{|k| k.created < now }.first
-  }
-}.map { |keyword|
-  rec = keyword[:recent]
-  prev = keyword[:previous]
-  if !prev
-    ['NEW', rec.level, rec.keyword, rec.uri].join(' ')
-  elsif rec.level != prev.level
-    status = rec.level > prev.level ? 'UP' : 'DOWN'
-    [status, "#{prev.level}->#{rec.level}", rec.keyword, rec.uri].join(' ')
-  else
-    nil
-  end
-}.compact.each { |post|
-  puts post
-  twitter.update post.toutf8
+border_level, last_hot_keywords = nil
+db.transaction {
+  border_level = db['border_level'] ||= 6
+  last_hot_keywords = db['hot_keywords'] ||= []
 }
 
-HotKeyword.filter{|k| k.created < now }.delete
+new_keywords = HotKeyword.fetch
+new_hot_keywords = new_keywords.select{ |k| k.level >= border_level}
+
+# call
+while command = ARGV.shift
+  case command
+  when 'NEW'
+    if last_hot_keywords.size > 0
+      (new_hot_keywords - last_hot_keywords).each{ |k|
+        api.update ['NEW', k.keyword, k.uri].join(' ')
+      }
+    end
+    db.transaction {
+      db['hot_keywords'] = new_hot_keywords
+    }
+  when 'RANKING'
+    ranking = new_hot_keywords.sort_by{ |k| k.level}.reverse.map{|k| k.keyword}.join(' ')
+    api.update ['RANKING', ranking, HotKeyword::SOURCE_URI].join(' ')
+  end
+end
