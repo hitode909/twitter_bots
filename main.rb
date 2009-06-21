@@ -30,6 +30,8 @@ while command = ARGV.shift
       (new_hot_keywords - last_hot_keywords).each{ |k|
         api.update ['HOT', k.keyword, k.uri].join(' ')
       }
+    else
+      puts "first time"
     end
     db.transaction {
       db['hot_keywords'] = new_hot_keywords
