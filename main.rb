@@ -5,7 +5,7 @@ require 'lib/model'
 
 # usage
 if ARGV.size == 0
-  raise "usage: this [RANKING, NEW]"
+  raise "usage: this [RANKING, HOT]"
 end
 
 # prepare
@@ -25,10 +25,10 @@ new_hot_keywords = new_keywords.select{ |k| k.level >= border_level}
 # call
 while command = ARGV.shift
   case command
-  when 'NEW'
+  when 'HOT'
     if last_hot_keywords.size > 0
       (new_hot_keywords - last_hot_keywords).each{ |k|
-        api.update ['NEW', k.keyword, k.uri].join(' ')
+        api.update ['HOT', k.keyword, k.uri].join(' ')
       }
     end
     db.transaction {
