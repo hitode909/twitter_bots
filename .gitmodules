@@ -1,3 +1,6 @@
 [submodule "modules/rl2"]
 	path = modules/rl2
 	url = git@github.com:hitode909/rl2.git
+[submodule "modules/bot2ch"]
+	path = modules/bot2ch
+	url = git://github.com/hitode909/bot2ch.git
