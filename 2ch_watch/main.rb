@@ -8,6 +8,22 @@ require 'sanitize'
 require 'cgi'
 require 'api'
 
+def shorturl url
+  open('http://to.ly/api.php?longurl=' + url).read
+rescue
+  open('http://is.gd/api.php?longurl=' + url).read
+rescue
+  url
+end
+
+def shortbody text
+  if text.split(//).length > 100
+    text.split(//)[0..100].join + '…'
+  else
+    text
+  end
+end
+
 def escape_body body
   CGI.unescapeHTML(body.gsub(/<[^>]*>/,'')).strip.gsub(/\s+|　/, ' ')
 end
@@ -25,7 +41,7 @@ threads.each{ |th|
     next if th.posts.length == last_fetched
     from = last_fetched ? last_fetched + 1 : 0
     th.posts[from..-1].each { |post|
-      api.update "#{post.index}: #{escape_body post.body} #{post.url}"
+      api.update "#{post.index}: #{shortbody(escape_body(post.body))} #{shorturl(post.url)}"
     }
     db[th.dat_no] = th.posts.length
   }
