@@ -39,7 +39,7 @@ threads.each{ |th|
   db.transaction {
     last_fetched = db[th.dat_no]
     next if th.posts.length == last_fetched
-    from = last_fetched ? last_fetched + 1 : 0
+    from = last_fetched || 0
     th.posts[from..-1].each { |post|
       api.update "#{post.index}: #{shortbody(escape_body(post.body))} #{shorturl(post.url)}"
     }
