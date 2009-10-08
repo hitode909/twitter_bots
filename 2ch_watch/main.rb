@@ -41,7 +41,7 @@ threads.each{ |th|
     next if th.posts.length == last_fetched
     from = last_fetched || 0
     th.posts[from..-1].each { |post|
-      api.update "#{post.index}: #{shortbody(escape_body(post.body))} #{shorturl(post.url)}"
+      api.update "#{post.index}: #{shortbody(escape_body(post.body).gsub(/h?ttp/, 'http'))} #{shorturl(post.url)}"
     }
     db[th.dat_no] = th.posts.length
   }
