@@ -30,19 +30,24 @@ end
 
 APPLICATION = '2ch_watch'
 api = Api.new(APPLICATION)
-db = PStore.new("#{Dir.tmpdir}/#{APPLICATION}")
-
+db = PStore.new(APPLICATION)
 menu = Bot2ch::Menu.new
 board = menu.get_board '/net/'
 threads = board.threads.select{|th| th.title =~ /Twitter/}
 threads.each{ |th|
   db.transaction {
     last_fetched = db[th.dat_no]
+    unless last_fetched
+      api.update "#{th.title} #{shorturl(th.url)}"
+    end
     next if th.posts.length == last_fetched
     from = last_fetched || 0
-    th.posts[from..-1].each { |post|
-      api.update "#{post.index}: #{shortbody(escape_body(post.body).gsub(/h?ttp/, 'http'))} #{shorturl(post.url)}"
-    }
+    begin
+      th.posts[from..-1].each { |post|
+        api.update "#{post.index}: #{shortbody(escape_body(post.body).gsub(/h?ttp/, 'http'))} #{shorturl(post.url)}"
+      }
+    rescue
+    end
     db[th.dat_no] = th.posts.length
   }
 }
